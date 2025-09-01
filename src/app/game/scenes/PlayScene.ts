@@ -4,22 +4,17 @@ export default class PlayScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private speed = 200
-  private collectibles!: Phaser.Physics.Arcade.Group
-  private score = 0
-  private scoreText!: Phaser.GameObjects.Text
-  private health = 3
-  private healthText!: Phaser.GameObjects.Text
+
+  private leftButton?: Phaser.GameObjects.Rectangle
+  private rightButton?: Phaser.GameObjects.Rectangle
+  private moveLeft = false
+  private moveRight = false
 
   constructor() {
     super({ key: 'PlayScene' })
   }
 
-  create() {
-    // -----------------------
-    // الخلفية
-    // -----------------------
-    this.add.image(512, 512, 'background').setScale(1).setOrigin(0.5)
-
+  create(): void {
     // -----------------------
     // الشخصية
     // -----------------------
@@ -27,6 +22,9 @@ export default class PlayScene extends Phaser.Scene {
     this.player.setScale(0.5)
     this.player.setCollideWorldBounds(true)
 
+    // -----------------------
+    // الرسوم المتحركة
+    // -----------------------
     this.anims.create({
       key: 'walk-right',
       frames: this.anims.generateFrameNumbers('player', { start: 0, end: 4 }),
@@ -39,95 +37,74 @@ export default class PlayScene extends Phaser.Scene {
       frameRate: 8,
       repeat: -1
     })
-    this.anims.create({
-      key: 'walk-up',
-      frames: this.anims.generateFrameNumbers('player', { start: 5, end: 7 }),
-      frameRate: 8,
-      repeat: -1
-    })
-    this.anims.create({
-      key: 'walk-down',
-      frames: this.anims.generateFrameNumbers('player', { start: 8, end: 10 }),
-      frameRate: 8,
-      repeat: -1
-    })
-
-    this.cursors = this.input.keyboard.createCursorKeys()
 
     // -----------------------
-    // الجدران / الحواجز
+    // تحكم الكيبورد
     // -----------------------
-    // const walls = this.physics.add.staticGroup()
-    // walls.create(200, 400, 'wall')
-    // walls.create(600, 400, 'wall')
-    // this.physics.add.collider(this.player, walls)
+    this.cursors = (this.input.keyboard as Phaser.Input.Keyboard.KeyboardPlugin).createCursorKeys()
 
     // -----------------------
-    // Collectibles
+    // أزرار الهاتف/تابلت
+    // تظهر فقط إذا الشاشة ≤ 1024px أو الجهاز يدعم لمس
     // -----------------------
-    // this.collectibles = this.physics.add.group({
-    //   key: 'coin',
-    //   repeat: 5,
-    //   setXY: { x: 100, y: 100, stepX: 150 }
-    // })
-    // this.physics.add.overlap(this.player, this.collectibles, this.collectCoin, undefined, this)
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    const showMobileButtons = window.innerWidth <= 1024 || isTouchDevice
 
-    // -----------------------
-    // Score + Health
-    // -----------------------
-    // this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '24px', color: '#fff' })
-    // this.healthText = this.add.text(16, 50, 'Health: 3', { fontSize: '24px', color: '#fff' })
+    if (showMobileButtons) {
+      const buttonSize = 100
+      const yPos = this.scale.height - buttonSize - 20
 
-    // -----------------------
-    // أعداء
-    // -----------------------
-    const enemy = this.physics.add.sprite(300, 300, 'enemy')
-    enemy.setCollideWorldBounds(true)
-    this.physics.add.collider(this.player, enemy, this.hitEnemy, undefined, this)
+      // زر يسار
+      this.leftButton = this.add.rectangle(80, yPos, buttonSize, buttonSize, 0x0000ff, 0.3)
+        .setInteractive()
+      this.setupButtonInteraction(this.leftButton, 'left')
+
+      // زر يمين
+      this.rightButton = this.add.rectangle(200, yPos, buttonSize, buttonSize, 0x00ff00, 0.3)
+        .setInteractive()
+      this.setupButtonInteraction(this.rightButton, 'right')
+    }
   }
 
-  update() {
-  if (!this.player) return
+  update(): void {
+    if (!this.player) return
 
-  // إيقاف الحركة
-  this.player.setVelocity(0)
+    this.player.setVelocityX(0)
 
-  // حركة أفقية
-  if (this.cursors.left?.isDown) {
-    this.player.setVelocityX(-this.speed)
-    if (!this.player.anims.isPlaying || this.player.anims.currentAnim.key !== 'walk-left') {
-      this.player.anims.play('walk-left', true)
+    // حركة أفقية بالكيبورد أو أزرار اللمس
+    if (this.cursors.left?.isDown || this.moveLeft) {
+      this.movePlayer('left')
+    } else if (this.cursors.right?.isDown || this.moveRight) {
+      this.movePlayer('right')
+    } else {
+      this.stopPlayer()
     }
-    this.player.setFlipX(true)
-  } else if (this.cursors.right?.isDown) {
-    this.player.setVelocityX(this.speed)
-    if (!this.player.anims.isPlaying || this.player.anims.currentAnim.key !== 'walk-right') {
-      this.player.anims.play('walk-right', true)
-    }
-    this.player.setFlipX(false)
   }
 
-  // حركة رأسية
-  if (this.cursors.up?.isDown) {
-    this.player.setVelocityY(-this.speed)
-    if (!this.player.anims.isPlaying || this.player.anims.currentAnim.key !== 'walk-up') {
-      this.player.anims.play('walk-up', true)
-    }
-  } else if (this.cursors.down?.isDown) {
-    this.player.setVelocityY(this.speed)
-  
+  // -----------------------
+  // دوال مساعدة
+  // -----------------------
+  private setupButtonInteraction(button: Phaser.GameObjects.Rectangle, direction: 'left' | 'right'): void {
+    button.on('pointerdown', () => direction === 'left' ? this.moveLeft = true : this.moveRight = true)
+    button.on('pointerup', () => direction === 'left' ? this.moveLeft = false : this.moveRight = false)
+    button.on('pointerout', () => direction === 'left' ? this.moveLeft = false : this.moveRight = false)
   }
 
-  // لو مفيش حركة
-  if (
-    !this.cursors.left?.isDown &&
-    !this.cursors.right?.isDown &&
-    !this.cursors.up?.isDown 
-  ) {
-    this.player.setVelocity(0)
+  private movePlayer(direction: 'left' | 'right'): void {
+    const velocity = direction === 'left' ? -this.speed : this.speed
+    const animKey = direction === 'left' ? 'walk-left' : 'walk-right'
+    const flipX = direction === 'left'
+
+    this.player.setVelocityX(velocity)
+    if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
+      this.player.anims.play(animKey, true)
+    }
+    this.player.setFlipX(flipX)
+  }
+
+  private stopPlayer(): void {
+    this.player.setVelocityX(0)
     this.player.anims.stop()
     this.player.setFrame(0)
   }
-}
-
 }
