@@ -6,11 +6,17 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // تحميل الـ sprite sheet
+    // -------- Player --------
     this.load.spritesheet('player', '/assets/sprites/player-sprite.png', {
-  frameWidth: 216,
-  frameHeight: 582
+      frameWidth: 216,
+      frameHeight: 582
     });
+
+    // -------- Background (فضاء) --------
+    this.load.image('bg-space', '/assets/backgrounds/bg.png');
+
+    // -------- Ground --------
+    this.load.image('ground', '/assets/backgrounds/ground.png');
   }
 
   create() {
