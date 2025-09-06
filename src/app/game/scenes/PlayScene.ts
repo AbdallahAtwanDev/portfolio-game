@@ -1,66 +1,76 @@
 import Phaser from 'phaser'
 import VirtualJoystick from 'phaser3-rex-plugins/plugins/virtualjoystick.js'
 
+interface Project {
+  name: string
+  color: number
+  x: number
+  y: number
+  link: string
+}
+
 export default class PlayScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
   private speed = 200
-private joystick!: VirtualJoystick
-
-  // الخلفيات (parallax layers)
+  private joystick!: VirtualJoystick
+  private jumpButton?: Phaser.GameObjects.Arc
+  private canJump = true
   private backgrounds: Phaser.GameObjects.TileSprite[] = []
+  private projects: Project[] = []
+  private projectPlatforms: Phaser.Physics.Arcade.StaticGroup | undefined
+  private popup!: Phaser.GameObjects.Container
 
   constructor() {
     super({ key: 'PlayScene' })
   }
 
   preload(): void {
+    // -------------------
+    // تحميل الصور والـ sprites
+    // -------------------
     this.load.image('layer1', '/assets/backgrounds/layer1-stars.png')
     this.load.image('layer2', '/assets/backgrounds/layer2-nebula.png')
     this.load.image('layer3', '/assets/backgrounds/layer3-galaxies.png')
-    // this.load.image('layer4', '/assets/backgrounds/layer4-planets.png')
-    // this.load.image('layer5', '/assets/backgrounds/layer5-debris.png')
+    this.load.image('ground', '/assets/backgrounds/ground.png')
     this.load.spritesheet('player', '/assets/sprites/player-sprite.png', {
       frameWidth: 216,
       frameHeight: 582
     })
-    this.load.image('ground', '/assets/sprites/ground.png')
   }
 
   create(): void {
     const { width, height } = this.scale
 
-    // -----------------------
-    // الخلفيات (Parallax Layers)
-    // -----------------------
+    // -------------------
+    // الخلفيات Parallax
+    // -------------------
     this.backgrounds.push(
       this.add.tileSprite(0, 0, width, height, 'layer1').setOrigin(0).setScrollFactor(0),
       this.add.tileSprite(0, 0, width, height, 'layer2').setOrigin(0).setScrollFactor(0),
-      this.add.tileSprite(0, 0, width, height, 'layer3').setOrigin(0).setScrollFactor(0),
-      // this.add.tileSprite(0, 0, width, height, 'layer4').setOrigin(0).setScrollFactor(0),
-      // this.add.tileSprite(0, 0, width, height, 'layer5').setOrigin(0).setScrollFactor(0)
+      this.add.tileSprite(0, 0, width, height, 'layer3').setOrigin(0).setScrollFactor(0)
     )
 
-    // -----------------------
+    // -------------------
     // الأرضية
-    // -----------------------
-    const ground = this.physics.add.staticImage(width /2, height, 'ground')
+    // -------------------
+    const ground = this.physics.add.staticImage(width / 2, height - 20, 'ground')
     ground.setOrigin(0.5, 1)
-    const scaleX = width / ground.width
-    ground.setScale(scaleX, 0.3).refreshBody()
+    ground.setScale(width / ground.width, 0.4)
+    ground.refreshBody()
 
-    // -----------------------
-    // اللاعب
-    // -----------------------
-    this.player = this.physics.add.sprite(width / 2, height - ground.displayHeight, 'player')
-    this.player.setScale(0.6)
+    // -------------------
+    // إعداد اللاعب
+    // -------------------
+    this.player = this.physics.add.sprite(width / 2, height - 150, 'player')
+    this.player.setScale(0.3)
     this.player.setCollideWorldBounds(true)
+    this.player.setGravityY(1000)
+    this.physics.add.collider(this.player, ground, () => (this.canJump = true))
 
-    this.physics.add.collider(this.player, ground)
-
-    // -----------------------
-    // الأنيمشن
-    // -----------------------
+    // -------------------
+    // الأنيميشن
+    // -------------------
     this.anims.create({
       key: 'walk-right',
       frames: this.anims.generateFrameNumbers('player', { start: 0, end: 4 }),
@@ -73,88 +83,117 @@ private joystick!: VirtualJoystick
       frameRate: 8,
       repeat: -1
     })
+    this.anims.create({ key: 'idle', frames: [{ key: 'player', frame: 0 }], frameRate: 1 })
+    this.anims.create({ key: 'jump', frames: [{ key: 'player', frame: 2 }], frameRate: 1 })
 
-    // -----------------------
-    // الكيبورد
-    // -----------------------
+    // -------------------
+    // التحكم بالكيبورد
+    // -------------------
     this.cursors = this.input.keyboard.createCursorKeys()
 
-    // -----------------------
-    // أزرار الموبايل (يمين/شمال فقط)
-    // -----------------------
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-    const showMobileButtons = window.innerWidth <= 1024 || isTouchDevice
-
-    if (showMobileButtons) {
+    // -------------------
+    // التحكم بالموبايل
+    // -------------------
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    if (window.innerWidth <= 1024 || isTouch) {
       this.joystick = new VirtualJoystick(this, {
         x: 120,
-        y: this.scale.height - 120,
+        y: height - 120,
         radius: 50,
         base: this.add.circle(0, 0, 50, 0x6666ff, 0.3),
         thumb: this.add.circle(0, 0, 25, 0xffffff, 0.8)
       })
-
       this.input.addPointer(1)
+
+      this.jumpButton = this.add
+        .circle(width - 100, height - 100, 40, 0xff6666, 0.5)
+        .setInteractive()
+        .on('pointerdown', () => this.jump())
     }
+
+    // -------------------
+    // إعداد منصات المشاريع
+    // -------------------
+    this.projects = [
+      { name: 'Project 1', color: 0xff5555, x: 200, y: height - 150, link: 'https://github.com/project1' },
+      { name: 'Project 2', color: 0x55ff55, x: 500, y: height - 250, link: 'https://github.com/project2' },
+      { name: 'Project 3', color: 0x5555ff, x: 800, y: height - 350, link: 'https://github.com/project3' }
+    ]
+
+    this.projectPlatforms = this.physics.add.staticGroup()
+    this.projects.forEach((proj) => {
+      const plat = this.add.rectangle(proj.x, proj.y, 150, 20, proj.color)
+      this.projectPlatforms!.add(plat)
+    })
+
+    // -------------------
+    // Collider بين اللاعب والمنصات
+    // -------------------
+    this.physics.add.collider(this.player, this.projectPlatforms!, (player, platform) => {
+      const proj = this.projects.find(
+        (p) => Math.abs(p.x - platform.x) < 10 && Math.abs(p.y - platform.y) < 10
+      )
+      if (proj) this.showPopup(proj)
+    })
+
+    // -------------------
+    // Popup للمشاريع
+    // -------------------
+    this.popup = this.add.container(0, 0)
+    this.popup.setVisible(false)
   }
 
   update(): void {
-    if (!this.player) return
-
+    // -------------------
+    // حركة اللاعب
+    // -------------------
     this.player.setVelocityX(0)
+    if (this.cursors.left?.isDown) this.movePlayer('left')
+    else if (this.cursors.right?.isDown) this.movePlayer('right')
+    else this.stopPlayer()
+    if (this.cursors.up?.isDown) this.jump()
 
-    let moving = false
-
-    // كيبورد
-    if (this.cursors.left?.isDown) {
-      this.movePlayer('left')
-      moving = true
-    } else if (this.cursors.right?.isDown) {
-      this.movePlayer('right')
-      moving = true
-    }
-
-    // Joystick (موبايل)
     if (this.joystick) {
-      const forceX = this.joystick.forceX
-
-      if (forceX < -10) {
-        this.movePlayer('left')
-        moving = true
-      } else if (forceX > 10) {
-        this.movePlayer('right')
-        moving = true
-      }
+      const fx = this.joystick.forceX
+      if (fx < -10) this.movePlayer('left')
+      else if (fx > 10) this.movePlayer('right')
     }
 
-    if (!moving) {
-      this.stopPlayer()
-    }
-
-    // تحريك الخلفية (Parallax)
+    // -------------------
+    // Parallax الخلفيات
+    // -------------------
     this.backgrounds[0].tilePositionX += 0.1
     this.backgrounds[1].tilePositionX += 0.3
     this.backgrounds[2].tilePositionX += 0.5
   }
 
-  // -----------------------
-  // دوال مساعدة
-  // -----------------------
-  private movePlayer(direction: 'left' | 'right'): void {
-    const velocity = direction === 'left' ? -this.speed : this.speed
-    const animKey = direction === 'left' ? 'walk-left' : 'walk-right'
-    const flipX = direction === 'left'
-
-    this.player.setVelocityX(velocity)
-    if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
-      this.player.anims.play(animKey, true)
-    }
-    this.player.setFlipX(flipX)
+  private movePlayer(dir: 'left' | 'right') {
+    const vel = dir === 'left' ? -this.speed : this.speed
+    this.player.setVelocityX(vel)
+    this.player.anims.play(dir === 'left' ? 'walk-left' : 'walk-right', true)
+    this.player.setFlipX(dir === 'left')
   }
 
-  private stopPlayer(): void {
+  private stopPlayer() {
     this.player.setVelocityX(0)
-    this.player.anims.stop()
-    this.player.setFrame(0)
+    this.player.anims.play('idle', true)
+  }
+
+  private jump() {
+    if (!this.canJump) return
+    this.player.setVelocityY(-500)
+    this.player.anims.play('jump', true)
+    this.canJump = false
+  }
+
+  private showPopup(proj: Project) {
+    this.popup.removeAll(true)
+    const rect = this.add.rectangle(proj.x, proj.y - 80, 180, 100, 0x000000, 0.7)
+    const text = this.add.text(proj.x - 80, proj.y - 110, proj.name, { fontSize: '16px', color: '#fff' })
+    const link = this.add.text(proj.x - 70, proj.y - 90, 'Visit', { fontSize: '14px', color: '#00f' })
+      .setInteractive()
+      .on('pointerdown', () => window.open(proj.link, '_blank'))
+    this.popup.add([rect, text, link])
+    this.popup.setVisible(true)
   }
 }

@@ -12,9 +12,6 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 582
     });
 
-    // -------- Background (فضاء) --------
-    this.load.image('bg-space', '/assets/backgrounds/bg.png');
-
     // -------- Ground --------
     this.load.image('ground', '/assets/backgrounds/ground.png');
   }
