@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portfolio Game — Abdullah</title>
 
 </head>
 <body>
@@ -30,12 +29,12 @@
   <div class="feature">
     <h2>🛠️ التثبيت</h2>
     <p>
-      <code>git clone &lt;REPO_URL&gt;</code><br>
+      <code>git clone https://github.com/AbdallahAtwanDev/portfolio-game.git;</code><br>
       <code>cd portfolio-game</code><br>
       <code>npm install</code><br>
       <code>npm run dev</code>
     </p>
-    <a href="https://github.com/USERNAME/portfolio-game" class="button" target="_blank">GitHub Repo</a>
+    <a href="https://github.com/AbdallahAtwanDev/portfolio-game.git" target="_blank">GitHub Repo</a>
   </div>
 
   <script>
