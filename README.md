@@ -37,18 +37,6 @@
     <a href="https://github.com/AbdallahAtwanDev/portfolio-game.git" target="_blank">GitHub Repo</a>
   </div>
 
-  <script>
-    // Simple animation for scroll fade-in
-    const features = document.querySelectorAll('.feature');
-    window.addEventListener('scroll', () => {
-      features.forEach(el => {
-        const top = el.getBoundingClientRect().top;
-        if(top < window.innerHeight - 50){
-          el.style.opacity = 1;
-          el.style.transform = "translateY(0)";
-        }
-      });
-    });
-  </script>
+
 </body>
 </html>
